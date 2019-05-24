@@ -31,5 +31,5 @@ action "publish" {
   needs = "tag-filter"
   uses = "actions/npm@master"
   args = "publish"
-  secrets = ["NPM_AUTH_TOKEN"]
+  secrets = ["NPM_AUTH_TOKEN", "CLUB_ID", "CLUB_PASSWORD", "WHOLESALE_ID"]
 }

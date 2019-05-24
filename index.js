@@ -142,6 +142,12 @@ module.exports = {
 
     const { error, value: validatedData } = Joi.validate(orderData, schema);
 
+    this.log(['info'], {
+      message: 'Submitting order',
+      inputData: orderData,
+      validatedData
+    });
+
     if (error) {
       throw new Error(error);
     }
