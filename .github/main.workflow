@@ -15,6 +15,7 @@ action "test" {
   needs = "build"
   uses = "actions/npm@master"
   args = "test"
+  secrets = ["CLUB_ID", "CLUB_PASSWORD", "WHOLESALE_ID"]
 }
 
 workflow "publish on release" {
@@ -31,5 +32,5 @@ action "publish" {
   needs = "tag-filter"
   uses = "actions/npm@master"
   args = "publish"
-  secrets = ["NPM_AUTH_TOKEN", "CLUB_ID", "CLUB_PASSWORD", "WHOLESALE_ID"]
+  secrets = ["NPM_AUTH_TOKEN"]
 }
