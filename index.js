@@ -2,74 +2,89 @@ const soap = require('soap');
 const Joi = require('joi');
 const { promisify: prom } = require('util');
 
-let SoapClient;
-let url = 'https://devtest.dotfit.com/webservices/OrdersService.asmx?WSDL';
+const urls = {
+  dev: 'https://devtest.dotfit.com/webservices/OrdersService.asmx?WSDL',
+  prod: 'https://www.dotfit.com/webservices/OrdersService.asmx?WSDL'
+};
 
-module.exports = {
-  get client() {
-    if (SoapClient) {
-      return Promise.resolve(SoapClient);
+class DotFit {
+  constructor(credentials, env = 'dev', debug = false) {
+    this.debug = debug;
+    if (this.debug) {
+      this.log(['info'], 'Debug logging enabled');
     }
 
+    const schema = Joi.object().keys({
+      clubId: Joi.string().required(),
+      clubPassword: Joi.string().required(),
+      wholesaleId: Joi.string().required()
+    }).required();
+
+    const { error, value: validatedData } = Joi.validate(credentials, schema);
+
+    if (error) {
+      this.log(['error'], { message: 'Invalid credentials', error });
+      throw new Error(error.details[0].message);
+    }
+
+    this.clubId = validatedData.clubId;
+    this.clubPassword = validatedData.clubPassword;
+    this.wholesaleId = validatedData.wholesaleId;
+
+    this.url = urls[env];
+
+    if (!this.url) {
+      throw new Error('Unsupported environment. Use dev or prod');
+    }
+
+    this.SoapClient = false;
+
+    return this;
+  }
+  get client() {
+    if (this.SoapClient) {
+      return Promise.resolve(this.SoapClient);
+    }
+
+    this.log(['info'], 'Client not initialized, initializing...');
+
     return this.createClient();
-  },
+  }
   set client(value) {
-    SoapClient = value;
-  },
-  get url() {
-    return url;
-  },
-  set url(value) {
-    url = value;
-  },
+    this.SoapClient = value;
+  }
   log(tags, msg) {
-    if (process.env.DEBUG) {
+    if (this.debug) {
       // eslint-disable-next-line no-console
       console.log(tags, msg);
     }
-  },
+  }
   async createClient() {
-    this.log(['info'], `Creating client for WSDL: ${url}`);
-    const client = await soap.createClientAsync(url);
-
-    const ClubID = process.env.CLUB_ID;
-    const ClubPassword = process.env.CLUB_PASSWORD;
-    const WholesaleID = process.env.WHOLESALE_ID;
-
-    if (!ClubID) {
-      throw new Error('CLUB_ID not set.');
-    }
-
-    if (!ClubPassword) {
-      throw new Error('CLUB_PASSWORD not set.');
-    }
-
-    if (!WholesaleID) {
-      throw new Error('WHOLESALE_ID not set.');
-    }
+    this.log(['info'], `Creating client for WSDL: ${this.url}`);
+    const client = await soap.createClientAsync(this.url);
 
     client.addSoapHeader(`
     <ClubAuthHeader xmlns="http://services.dotfit.com/">
-      <ClubID>${ClubID}</ClubID>
-      <ClubPassword>${ClubPassword}</ClubPassword>
+      <ClubID>${this.clubId}</ClubID>
+      <ClubPassword>${this.clubPassword}</ClubPassword>
     </ClubAuthHeader>`);
 
     this.client = client;
 
     return this.client;
-  },
+  }
   async describe() {
     const client = await this.client;
 
     return client.describe();
-  },
+  }
   async inventory() {
     const client = await this.client;
 
     const response = await prom(client.OrdersService.OrdersServiceSoap12.GetInventory)({});
 
     return response.GetInventoryResult.InventoryItem;
-  },
+  }
   async shipmentsByDate(start, end) {
     const client = await this.client;
 
@@ -92,26 +107,36 @@ module.exports = {
     }
 
     return response.GetShipmentInfoByDateResult.ShippedOrder;
-  },
+  }
   async shipmentsById(orderId) {
     const client = await this.client;
 
     this.log(['info'], `Getting shipments by order id: ${orderId}`);
 
-    const response = await prom(client.OrdersService.OrdersServiceSoap12.GetShipmentInfoByID)({
-      OrderID: orderId
-    });
+    let response;
 
-    if (!response.GetShipmentInfoByIDResult) {
+    try {
+      response = await prom(client.OrdersService.OrdersServiceSoap12.GetShipmentInfoByID)({
+        OrderID: orderId
+      });
+    } catch (error) {
+      this.log(['error'], {
+        message: `Problem getting order by id ${orderId}`,
+        error
+      });
+    }
+
+    if (!response || !response.GetShipmentInfoByIDResult) {
       this.log(['info'], `No shipments found for order id: ${orderId}`);
-
-      response.GetShipmentInfoByIDResult = {
-        ShippedOrder: {}
+      response = {
+        GetShipmentInfoByIDResult: {
+          ShippedOrder: []
+        }
       };
     }
 
     return response.GetShipmentInfoByIDResult.ShippedOrder;
-  },
+  }
   async createOrder(orderData) {
     const client = await this.client;
 
@@ -156,4 +181,6 @@ module.exports = {
 
     return response.PlaceWholesaleOrderResult;
   }
-};
+}
+
+module.exports = DotFit;

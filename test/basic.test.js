@@ -2,47 +2,96 @@
 require('dotenv').config();
 
 const tap = require('tap');
-const lib = require('../');
+const DotFit = require('../');
 
-tap.test('Allows url to be set', (assert) => {
-  assert.equal(lib.url, 'https://devtest.dotfit.com/webservices/OrdersService.asmx?WSDL', 'Defaults to devtest');
+tap.test('Sets url based on env', (assert) => {
+  assert.plan(4);
 
-  lib.url = 'https://localhost/webservices/OrdersService.asmx?WSDL';
-  assert.equal(lib.url, 'https://localhost/webservices/OrdersService.asmx?WSDL', 'Can set url');
+  const libDefault = new DotFit({
+    clubId: process.env.CLUB_ID,
+    clubPassword: process.env.CLUB_PASSWORD,
+    wholesaleId: process.env.WHOLESALE_ID
+  });
 
-  lib.url = 'https://devtest.dotfit.com/webservices/OrdersService.asmx?WSDL';
-  assert.equal(lib.url, 'https://devtest.dotfit.com/webservices/OrdersService.asmx?WSDL', 'Set back to devtest');
+  assert.equal(libDefault.url, 'https://devtest.dotfit.com/webservices/OrdersService.asmx?WSDL', 'Defaults to devtest');
+
+  const libDev = new DotFit({
+    clubId: process.env.CLUB_ID,
+    clubPassword: process.env.CLUB_PASSWORD,
+    wholesaleId: process.env.WHOLESALE_ID
+  }, 'dev');
+
+  assert.equal(libDev.url, 'https://devtest.dotfit.com/webservices/OrdersService.asmx?WSDL', 'Passing dev sets to dev url');
+
+  const libProd = new DotFit({
+    clubId: process.env.CLUB_ID,
+    clubPassword: process.env.CLUB_PASSWORD,
+    wholesaleId: process.env.WHOLESALE_ID
+  }, 'prod');
+
+  assert.equal(libProd.url, 'https://www.dotfit.com/webservices/OrdersService.asmx?WSDL', 'Passing prod sets to prod url');
+
+  try {
+    new DotFit({
+      clubId: process.env.CLUB_ID,
+      clubPassword: process.env.CLUB_PASSWORD,
+      wholesaleId: process.env.WHOLESALE_ID
+    }, 'wrongenv');
+  } catch (e) {
+    assert.equal(e.message, 'Unsupported environment. Use dev or prod', 'Fails on unsupported environment');
+  }
 
   assert.end();
 });
 
-tap.test('Requires credentials', async (assert) => {
-  const clubId = process.env.CLUB_ID;
-  const clubPw = process.env.CLUB_PASSWORD;
-  const wholesaleId = process.env.WHOLESALE_ID;
+tap.test('Requires credentials', (assert) => {
+  assert.plan(4);
 
-  delete process.env.CLUB_ID;
-  delete process.env.CLUB_PASSWORD;
-  delete process.env.WHOLESALE_ID;
+  try {
+    new DotFit({}, 'dev');
+  } catch (e) {
+    assert.equal(e.message, '"clubId" is required', 'Ensures clubId set');
+  }
 
-  await assert.rejects(lib.createClient.bind(lib), new Error('CLUB_ID not set.'), 'Ensures CLUB_ID set');
+  try {
+    new DotFit({
+      clubId: process.env.CLUB_ID
+    }, 'dev');
+  } catch (e) {
+    assert.equal(e.message, '"clubPassword" is required', 'Ensures clubPassword set');
+  }
 
-  process.env.CLUB_ID = clubId;
+  try {
+    new DotFit({
+      clubId: process.env.CLUB_ID,
+      clubPassword: process.env.CLUB_PASSWORD
+    }, 'dev');
+  } catch (e) {
+    assert.equal(e.message, '"wholesaleId" is required', 'Ensures wholesaleId set');
+  }
 
-  await assert.rejects(lib.createClient.bind(lib), new Error('CLUB_PASSWORD not set.'), 'Ensures CLUB_PASSWORD set');
+  try {
+    new DotFit({
+      clubId: process.env.CLUB_ID,
+      clubPassword: process.env.CLUB_PASSWORD,
+      wholesaleId: process.env.WHOLESALE_ID
+    }, 'dev');
 
-  process.env.CLUB_PASSWORD = clubPw;
-
-  await assert.rejects(lib.createClient.bind(lib), new Error('WHOLESALE_ID not set.'), 'Ensures WHOLESALE_ID set');
-
-  process.env.WHOLESALE_ID = wholesaleId;
-
-  await assert.resolves(lib.createClient.bind(lib), 'All required ENV vars present');
+    assert.ok('All credentials pass');
+  } catch (e) {
+    assert.error(e, 'Something went wrong');
+  }
 
   assert.end();
 });
 
 tap.test('Sets up connection, gets WSDL', async (assert) => {
+  const lib = new DotFit({
+    clubId: process.env.CLUB_ID,
+    clubPassword: process.env.CLUB_PASSWORD,
+    wholesaleId: process.env.WHOLESALE_ID
+  }, 'dev');
+
   const desc = await lib.describe();
 
   assert.ok(desc.hasOwnProperty('OrdersService'), 'Has the OrdersService service');
@@ -58,9 +107,14 @@ tap.test('Sets up connection, gets WSDL', async (assert) => {
 });
 
 tap.test('Logging works', (assert) => {
-  const isDebug = process.env.DEBUG;
+  // eslint-disable-next-line no-console
   const oldLog = console.log;
-  delete process.env.DEBUG;
+
+  let lib = new DotFit({
+    clubId: process.env.CLUB_ID,
+    clubPassword: process.env.CLUB_PASSWORD,
+    wholesaleId: process.env.WHOLESALE_ID
+  }, 'dev', false);
 
   let tags;
   let msg;
@@ -76,14 +130,16 @@ tap.test('Logging works', (assert) => {
   assert.notOk(tags, 'Tags not set, logging disabled');
   assert.notOk(msg, 'Message not set, logging disabled');
 
-  process.env.DEBUG = 1;
+  lib = new DotFit({
+    clubId: process.env.CLUB_ID,
+    clubPassword: process.env.CLUB_PASSWORD,
+    wholesaleId: process.env.WHOLESALE_ID
+  }, 'dev', true);
 
   lib.log(['test1'], 'message');
 
   assert.deepEqual(tags, ['test1'], 'Tags set, logging enabled');
   assert.equal(msg, 'message', 'Message set, logging enabled');
-
-  process.env.DEBUG = isDebug;
 
   // eslint-disable-next-line no-console
   console.log = oldLog;

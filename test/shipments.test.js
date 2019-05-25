@@ -3,7 +3,7 @@ require('dotenv').config();
 
 const tap = require('tap');
 const moment = require('moment');
-const lib = require('../');
+const DotFit = require('../');
 
 const fakeAddress = {
   FirstName: 'Diane',
@@ -19,7 +19,7 @@ const fakeAddress = {
 };
 let inventory;
 
-const createOrder = async function(address = fakeAddress) {
+const createOrder = async function(lib, address = fakeAddress) {
   if (!inventory) {
     inventory = await lib.inventory();
   }
@@ -39,7 +39,13 @@ const createOrder = async function(address = fakeAddress) {
 };
 
 tap.test('Creates an order', async (assert) => {
-  const order = await createOrder();
+  const lib = new DotFit({
+    clubId: process.env.CLUB_ID,
+    clubPassword: process.env.CLUB_PASSWORD,
+    wholesaleId: process.env.WHOLESALE_ID
+  }, 'dev');
+
+  const order = await createOrder(lib);
 
   assert.type(order, 'number', 'Order number comes back');
 
@@ -47,7 +53,13 @@ tap.test('Creates an order', async (assert) => {
 });
 
 tap.test('Handles faulty data', async (assert) => {
-  await assert.rejects(createOrder({
+  const lib = new DotFit({
+    clubId: process.env.CLUB_ID,
+    clubPassword: process.env.CLUB_PASSWORD,
+    wholesaleId: process.env.WHOLESALE_ID
+  }, 'dev');
+
+  await assert.rejects(createOrder(lib, {
     firstname: 'lowercase first name'
   }), 'Validation fails');
 
@@ -55,7 +67,13 @@ tap.test('Handles faulty data', async (assert) => {
 });
 
 tap.test('Gets Shipments by date', async (assert) => {
-  const order = await createOrder();
+  const lib = new DotFit({
+    clubId: process.env.CLUB_ID,
+    clubPassword: process.env.CLUB_PASSWORD,
+    wholesaleId: process.env.WHOLESALE_ID
+  }, 'dev');
+
+  const order = await createOrder(lib);
 
   assert.type(order, 'number', 'Order number comes back');
 
@@ -79,8 +97,32 @@ tap.test('Gets Shipments by date', async (assert) => {
   assert.end();
 });
 
+tap.test('Handles when no shipments returned by date', async (assert) => {
+  const lib = new DotFit({
+    clubId: process.env.CLUB_ID,
+    clubPassword: process.env.CLUB_PASSWORD,
+    wholesaleId: process.env.WHOLESALE_ID
+  }, 'dev');
+
+  const start = moment().add(30, 'days').toDate();
+  const end = moment().add(1, 'day').toDate();
+
+  const shipments = await lib.shipmentsByDate(start, end);
+
+  assert.ok(Array.isArray(shipments), 'Shipments comes back as an array');
+  assert.equal(shipments.length, 0, 'Shipments has no items');
+
+  assert.end();
+});
+
 tap.test('Gets Shipments by id', async (assert) => {
-  const order = await createOrder();
+  const lib = new DotFit({
+    clubId: process.env.CLUB_ID,
+    clubPassword: process.env.CLUB_PASSWORD,
+    wholesaleId: process.env.WHOLESALE_ID
+  }, 'dev');
+
+  const order = await createOrder(lib);
 
   assert.type(order, 'number', 'Order number comes back');
 
@@ -97,6 +139,21 @@ tap.test('Gets Shipments by id', async (assert) => {
     'TrackingNumbers',
     'TrackingUrls'
   ], 'Shipment keys returned');
+
+  assert.end();
+});
+
+tap.test('Handles no shipments returned for an id', async (assert) => {
+  const lib = new DotFit({
+    clubId: process.env.CLUB_ID,
+    clubPassword: process.env.CLUB_PASSWORD,
+    wholesaleId: process.env.WHOLESALE_ID
+  }, 'dev');
+
+  const shipment = await lib.shipmentsById(0);
+
+  assert.ok(Array.isArray(shipment), 'Shipment comes back as an array');
+  assert.equal(shipment.length, 0, 'Shipment has no items');
 
   assert.end();
 });
