@@ -2,6 +2,10 @@
   "name": "dotfit",
   "version": "1.0.0",
   "description": "A node wrapper for the DotFit api",
+  "files": [
+    "./index.js",
+    "./README.md"
+  ],
   "main": "index.js",
   "scripts": {
     "test": "TAP_TIMEOUT=45 NODE_ENV=test tap --100 --jobs=1 test/*.test.js --cov",
