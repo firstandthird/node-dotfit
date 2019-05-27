@@ -141,7 +141,7 @@ class DotFit {
     const client = await this.client;
 
     const schema = Joi.object().keys({
-      wholesaleUserID: Joi.number().optional().default(process.env.WHOLESALE_ID),
+      wholesaleUserID: Joi.number().optional().default(this.wholesaleId),
       shippingInfo: Joi.object().keys({
         FirstName: Joi.string().required(),
         LastName: Joi.string().required(),
