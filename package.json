@@ -1,6 +1,6 @@
 {
   "name": "dotfit",
-  "version": "1.0.1",
+  "version": "1.0.2-alpha1",
   "description": "A node wrapper for the DotFit api",
   "files": [
     "./index.js",
@@ -29,7 +29,7 @@
   "homepage": "https://github.com/firstandthird/node-dotfit#readme",
   "dependencies": {
     "joi": "^14.3.1",
-    "soap": "^0.27.1"
+    "soap": "^0.43.0"
   },
   "devDependencies": {
     "dotenv": "^8.0.0",
